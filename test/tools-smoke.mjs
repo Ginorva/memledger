@@ -166,6 +166,54 @@ async function main() {
   })
   check('rejects a shelved entry with a hollow why', thinWhy.ok === false, JSON.stringify(thinWhy))
 
+  console.log('duplicate guard:')
+  writeFileSync(join(REPO, 'dup.py'), 'def f():\n    return 1\n', 'utf-8')
+  const first = await add.execute({
+    root: REPO,
+    title: '第一次修 dup::f',
+    type: '修复',
+    status: '已落地',
+    anchor: 'dup.py::f',
+    why: '第一次的原因，写清楚。',
+  })
+  check('first record accepted', first.ok === true, JSON.stringify(first))
+  const second = await add.execute({
+    root: REPO,
+    title: '第二次修同一个函数',
+    type: '修复',
+    status: '已落地',
+    anchor: 'dup.py::f',
+    why: '这次的原因，但没传 force。',
+  })
+  check('duplicate is refused', second.ok === false && second.refused === true, JSON.stringify(second).slice(0, 120))
+  check('names the earlier entry', Array.isArray(second.collidesWith) && second.collidesWith.includes(first.entryId), JSON.stringify(second.collidesWith))
+  check('quotes the earlier why', String(second.message).includes('第一次的原因'), String(second.message).slice(0, 160))
+  check('says how to override', String(second.message).includes('force'), String(second.message).slice(0, 160))
+
+  const afterRefusal = readFileSync(join(REPO, 'docs', '变更台账.md'), 'utf-8')
+  check('refused duplicate wrote nothing', !afterRefusal.includes('第二次修同一个函数'))
+
+  const forced = await add.execute({
+    root: REPO,
+    title: '第二次修同一个函数',
+    type: '修复',
+    status: '已落地',
+    anchor: 'dup.py::f',
+    why: '这次与上次不同：上次只补了返回值，这次要改并发路径。',
+    force: true,
+  })
+  check('force overrides the guard', forced.ok === true, JSON.stringify(forced).slice(0, 120))
+
+  const revert = await add.execute({
+    root: REPO,
+    title: '回退 dup::f 的改动',
+    type: '修复',
+    status: '已回退',
+    anchor: 'dup.py::f',
+    why: '回退是记录结果，不是重复记录同一件事。',
+  })
+  check('a revert is not blocked by the guard', revert.ok === true, JSON.stringify(revert).slice(0, 120))
+
   console.log('ledger_search:')
   const found = await search.execute({ root: REPO, query: '闸门' })
   check('ok', found.ok === true, JSON.stringify(found))
