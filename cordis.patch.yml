@@ -1,0 +1,4 @@
+# Register the dsh-memledger plugin
+- insert:
+    - id: memledger
+      name: dsh-memledger
