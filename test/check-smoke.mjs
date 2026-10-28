@@ -67,6 +67,8 @@ ${entry('CL-20261003-01', '补数重入第一次修复', '已落地', 'core/back
 ${entry('CL-20261004-01', '补数重入第二次修复', '已落地', 'core/backfill.py::run', '锁没覆盖并发路径，重做一次。')}
 ${entry('CL-20261005-01', '分钟线补数方案暂缓', '搁置', 'core/backfill.py', '限流期间补数会污染缓存，等正式接口上线。', '重启条件：拿到券商正式接口')}
 ${entry('CL-20261006-01', '绝对路径写法的锚点', '已落地', 'D:\\\\repo\\\\other\\\\module.py::thing', '用绝对路径写的，也要能匹配。')}
+${entry('CL-20261007-01', '安静模块的第一个函数', '已落地', 'core/quiet.py::alpha', '同一文件的不同函数，不该算重复修复。')}
+${entry('CL-20261008-01', '安静模块的第二个函数', '已落地', 'core/quiet.py::beta', '同一文件的不同函数，不该算重复修复。')}
 <!-- 条目:END -->
 `
 }
@@ -115,6 +117,13 @@ async function main() {
   const repeated = await spec.execute({ root: LAB, paths: ['core/backfill.py'] })
   check('verdict is repeated-repair', repeated.verdicts[0]?.verdict === 'repeated-repair', repeated.verdicts[0]?.verdict)
   check('lists both landed entries', repeated.verdicts[0]?.entries.filter((e) => e.status === '已落地').length === 2, JSON.stringify(repeated.verdicts[0]?.entries.map((e) => e.id)))
+
+  console.log('two different symbols in one file is NOT a repeat:')
+  touch('core/quiet.py')
+  const twoSymbols = await spec.execute({ root: LAB, paths: ['core/quiet.py'] })
+  check('verdict is already-done, not repeated-repair', twoSymbols.verdicts[0]?.verdict === 'already-done', twoSymbols.verdicts[0]?.verdict)
+  check('both entries are still listed', twoSymbols.verdicts[0]?.entries.length === 2, String(twoSymbols.verdicts[0]?.entries.length))
+  check('not counted as risky', twoSymbols.risky === 0, String(twoSymbols.risky))
 
   console.log('shelved is respected:')
   // backfill.py has landed entries too, so use a path anchored only by the shelved entry.
