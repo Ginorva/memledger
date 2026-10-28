@@ -81,8 +81,8 @@ async function main() {
   }
   console.log('registration:')
   check('apply does not throw', applyError === null, applyError && applyError.message)
-  check('registers five tools', ctx.registered.size === 5, String(ctx.registered.size))
-  for (const name of ['ledger_check', 'ledger_bootstrap', 'ledger_search', 'ledger_add', 'ledger_verify']) {
+  check('registers six tools', ctx.registered.size === 6, String(ctx.registered.size))
+  for (const name of ['ledger_map', 'ledger_check', 'ledger_bootstrap', 'ledger_search', 'ledger_add', 'ledger_verify']) {
     const spec = ctx.registered.get(name)
     check(name + ' registered', spec !== undefined)
     check(name + ' has a description', typeof spec?.description === 'string' && spec.description.length > 20)
@@ -97,10 +97,21 @@ async function main() {
     JSON.stringify(ctx.registered.get('ledger_bootstrap')?.parameters?.required),
   )
 
+  const map = ctx.registered.get('ledger_map')
   const bootstrap = ctx.registered.get('ledger_bootstrap')
   const search = ctx.registered.get('ledger_search')
   const add = ctx.registered.get('ledger_add')
   const verify = ctx.registered.get('ledger_verify')
+
+  console.log('ledger_map execution:')
+  const mapResult = await map.execute({ root: REPO, refresh: true })
+  check('map reports ok', mapResult.ok === true, JSON.stringify(mapResult))
+  check('map generated file', existsSync(join(REPO, 'docs', '项目结构.md')))
+  check('map found files', mapResult.fileCount > 0, String(mapResult.fileCount))
+  check('map found symbols', mapResult.symbolCount > 0, String(mapResult.symbolCount))
+  const mapContent = readFileSync(join(REPO, 'docs', '项目结构.md'), 'utf-8')
+  check('map contains header', mapContent.includes('# 项目结构与代码骨架地图'))
+  check('map message formatted nicely', mapResult.message.includes('🗺️'))
 
   console.log('bootstrap without root is refused:')
   const noRoot = await bootstrap.execute({})
