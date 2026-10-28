@@ -1,3 +1,10 @@
+# dsh-memledger bundle patch.
+#
+# Loader convention (observed in dsh-context and dsh-unlag): `id` is the
+# plugin's own name as exported by lib/index.js, and `name` is the package to
+# import. Keeping the two aligned is what makes the plugin manager's
+# "enable" toggle — which writes a `- id: <id>` entry of its own — resolve to
+# a real loader entry instead of a dangling one that crashes boot.
 - insert:
-    - id: memledger
+    - id: dsh-memledger
       name: dsh-memledger

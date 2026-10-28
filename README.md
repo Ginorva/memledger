@@ -93,11 +93,15 @@ window.__ModuleLoader__.load({
 
 ```yaml
 - insert:
-    - id: memledger
+    - id: dsh-memledger
       name: dsh-memledger
 ```
 
-> ⚠️ 这段必须有。它负责把 `memledger` 这个 id 真正插进加载器树；缺了它，插件管理器"启用"时写入的 `- id: memledger` 就会变成**空指向条目**，**DSH 下次启动直接崩溃**。
+> ⚠️ `id` 必须等于 `lib/index.js` 导出的 `name`，`name` 才是包名（`dsh-context`、`dsh-unlag` 都是这个写法；`dshmarket` 的 `id: dsh-market` 与导出名一致、`name: dshmarket` 才是包名）。对不齐就会出现"启用后变成空指向条目"的故障。
+>
+> ⚠️ 这段必须有。它负责把 `dsh-memledger` 真正插进加载器树；缺了它，插件管理器"启用"时写入的 `- id: dsh-memledger` 就会变成**空指向条目**，**DSH 下次启动直接崩溃**。
+>
+> ⚠️ 不要在 profile 自己的 `cordis.patch.yml` 里手写这个条目——它由 bundle 提供。两边都写会变成重复挂载。
 
 ---
 
