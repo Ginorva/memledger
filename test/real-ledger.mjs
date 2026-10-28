@@ -1,103 +1,163 @@
-// Exercise the plugin's routes against a real, large ledger.
+// Validate `ledger_check` against a real, messy ledger.
 //
-// The smoke test uses a tiny fixture; this one points the same handlers at an
-// actual project ledger (209 KB, 69 entries) because a parser that only works
-// on a hand-written sample is not evidence of anything.
+// A fixture proves the code does what I wrote down; it does not prove the anchor
+// parser survives a ledger written by a human over months. Real anchors here mix
+// backticks, CJK prefixes (`引擎 ...`), several paths per entry, directory-level
+// anchors and prose-only anchors (`（无代码改动）...`).
+//
+// The two numbers that matter:
+//
+//   coverage  — how many entries yield at least one usable file path
+//   recall    — for an entry with an existing path, does ledger_check on that
+//               path find that same entry
+//
+// Recall below 100% is the dangerous case: the tool would answer "no history
+// here" about work that does have history, which is exactly how a project
+// repeats work it already did.
+//
+//   node test/real-ledger.mjs /path/to/repo
 
-import { pathToFileURL } from 'node:url'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { anchorPathsOf } from '../lib/anchors.js'
 
-const ROOT = 'D:/zyd_apps/技术钻研/dsh_new/mem-ledger'
-const REAL = process.argv[2]
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
-function fakeRes() {
-  const collected = { status: 0, body: '' }
-  return { collected, writeHead(s) { collected.status = s }, end(t) { collected.body = t } }
+let failures = 0
+function check(label, condition, detail) {
+  if (condition) {
+    console.log('  PASS  ' + label + (detail === undefined ? '' : '  (' + detail + ')'))
+  } else {
+    failures += 1
+    console.log('  FAIL  ' + label + (detail === undefined ? '' : '  (' + detail + ')'))
+  }
+}
+
+async function loadTools() {
+  const module = await import(pathToFileURL(join(ROOT, 'lib', 'index.js')).href)
+  const registered = new Map()
+  module.apply({
+    effect: (fn) => fn(),
+    get: (name, strict) =>
+      name === 'tools'
+        ? { register: (spec) => { registered.set(spec.name, spec); return () => {} } }
+        : strict === false
+          ? undefined
+          : undefined,
+    logger: () => ({ warn: () => {} }),
+  })
+  return registered
+}
+
+/**
+ * Use the shipped anchor parser directly. It used to be lifted out of
+ * agent-tools.js source text, which was fragile; it now lives in its own module.
+ */
+function loadAnchorPathsOf() {
+  return anchorPathsOf
 }
 
 async function main() {
-  if (!REAL) {
+  const repo = process.argv[2]
+  if (!repo) {
     console.log('usage: node test/real-ledger.mjs <repo-root>')
     process.exit(2)
   }
-  const module = await import(pathToFileURL(join(ROOT, 'lib', 'index.js')).href)
-  const routes = new Map()
-  module.apply({
-    webServer: { register: (r) => { routes.set(r.path, r.handler); return () => {} } },
-    effect: (fn) => fn(),
-  })
 
-  let failures = 0
-  const check = (label, ok, detail) => {
-    if (ok) console.log('  PASS  ' + label)
-    else { failures += 1; console.log('  FAIL  ' + label + (detail === undefined ? '' : ' -> ' + detail)) }
+  const registered = await loadTools()
+  const checkTool = registered.get('ledger_check')
+  const searchTool = registered.get('ledger_search')
+  const verifyTool = registered.get('ledger_verify')
+  if (!checkTool || !searchTool || !verifyTool) {
+    console.log('FAIL: tools did not register')
+    process.exit(1)
   }
 
-  const statusRes = fakeRes()
-  await routes.get('/api/memledger/status')({ url: '/api/memledger/status?root=' + encodeURIComponent(REAL) }, statusRes)
-  const status = JSON.parse(statusRes.collected.body)
-  console.log('status:')
-  check('HTTP 200', statusRes.collected.status === 200, String(statusRes.collected.status))
-  check('hasLedger', status.hasLedger === true)
-  check('parsed a non-trivial number of entries', status.totalCount >= 40, 'totalCount=' + status.totalCount)
-  check('pendingCount is sane', status.pendingCount >= 0 && status.pendingCount <= status.totalCount, 'pending=' + status.pendingCount)
+  const everything = await searchTool.execute({ root: repo, limit: 500 })
+  const { parseLedgerMarkdown } = await import(pathToFileURL(join(ROOT, 'lib', 'markdown-parser.js')).href)
+  const entries = parseLedgerMarkdown(readFileSync(join(repo, 'docs', '变更台账.md'), 'utf-8'))
 
-  const allRes = fakeRes()
-  await routes.get('/api/memledger/entries')({ url: '/api/memledger/entries?root=' + encodeURIComponent(REAL) }, allRes)
-  const all = JSON.parse(allRes.collected.body)
-  console.log('entries:')
-  check('HTTP 200', allRes.collected.status === 200, String(allRes.collected.status))
-  check('entry count matches status', all.entries.length === status.totalCount, all.entries.length + ' vs ' + status.totalCount)
-  const withId = all.entries.filter((e) => e.id).length
-  check('every entry has an id', withId === all.entries.length, withId + '/' + all.entries.length)
-  const withAnchor = all.entries.filter((e) => e.anchor).length
-  check('most entries carry an anchor', withAnchor >= all.entries.length * 0.8, withAnchor + '/' + all.entries.length)
-  const withWhy = all.entries.filter((e) => e.why).length
-  check('most entries carry a why', withWhy >= all.entries.length * 0.8, withWhy + '/' + all.entries.length)
-  const datesOk = all.entries.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)).length
-  check('dates parse to YYYY-MM-DD', datesOk >= all.entries.length * 0.9, datesOk + '/' + all.entries.length)
+  console.log('ledger:')
+  check('parsed a non-trivial number of entries', everything.total >= 40, 'total=' + everything.total)
+  check('tool and parser agree', entries.length === everything.total, entries.length + ' vs ' + everything.total)
 
-  console.log('sample entry:')
-  const sample = all.entries.find((e) => e.anchor && e.why)
-  if (sample) {
-    console.log('    id      ' + sample.id)
-    console.log('    title   ' + sample.title)
-    console.log('    status  ' + sample.status)
-    console.log('    anchor  ' + sample.anchor)
-    console.log('    why     ' + String(sample.why).slice(0, 60))
-  } else {
-    failures += 1
-    console.log('  FAIL  no entry had both anchor and why')
+  const anchorPathsOf = loadAnchorPathsOf()
+
+  let withPaths = 0
+  let proseOnly = 0
+  const samples = []
+  for (const entry of entries) {
+    const paths = anchorPathsOf(entry.anchor)
+    if (paths.length > 0) {
+      withPaths += 1
+      if (samples.length < 6 && existsSync(join(repo, paths[0]))) samples.push({ entry, path: paths[0] })
+    } else if (String(entry.anchor).includes('无代码改动')) {
+      proseOnly += 1
+    }
   }
 
-  console.log('search on real data:')
-  const started = Date.now()
-  const qRes = fakeRes()
-  await routes.get('/api/memledger/entries')(
-    { url: '/api/memledger/entries?q=' + encodeURIComponent('闸门') + '&root=' + encodeURIComponent(REAL) },
-    qRes,
-  )
-  const elapsed = Date.now() - started
-  const q = JSON.parse(qRes.collected.body)
-  check('search returned something', q.entries.length > 0, String(q.entries.length))
-  check('search returned fewer than all', q.entries.length < all.entries.length, q.entries.length + '/' + all.entries.length)
-  check('search finished under 1000ms', elapsed < 1000, elapsed + 'ms')
+  console.log('\nanchor parsing on real data:')
+  check('most entries yield a usable path', withPaths >= entries.length * 0.7, withPaths + '/' + entries.length)
+  check('prose-only anchors are recognised, not mangled', proseOnly >= 1, String(proseOnly))
+  console.log('   entries=' + entries.length + '  withPath=' + withPaths + '  proseOnly=' + proseOnly)
 
-  const pRes = fakeRes()
-  await routes.get('/api/memledger/entries')(
-    { url: '/api/memledger/entries?status=pending&root=' + encodeURIComponent(REAL) },
-    pRes,
+  console.log('\nrecall - ledger_check must find an entry by its own path:')
+  let recallChecked = 0
+  let recallHit = 0
+  const misses = []
+  for (const entry of entries) {
+    const paths = anchorPathsOf(entry.anchor)
+    if (paths.length === 0) continue
+    if (!existsSync(join(repo, paths[0]))) continue
+    recallChecked += 1
+    const result = await checkTool.execute({ root: repo, paths: [paths[0]] })
+    const ids = (result.verdicts?.[0]?.entries ?? []).map((e) => e.id)
+    if (ids.includes(entry.id)) recallHit += 1
+    else if (misses.length < 5) misses.push(entry.id + ' @ ' + paths[0] + ' -> ' + result.verdicts?.[0]?.verdict)
+  }
+  check('recall is total', recallChecked > 0 && recallHit === recallChecked, recallHit + '/' + recallChecked)
+  for (const miss of misses) console.log('   miss: ' + miss)
+
+  console.log('\nsample verdicts on real paths:')
+  for (const sample of samples) {
+    const result = await checkTool.execute({ root: repo, paths: [sample.path] })
+    const verdict = result.verdicts?.[0]
+    const count = verdict?.entries?.length ?? 0
+    console.log('   ' + String(verdict?.verdict ?? '?').padEnd(15) + sample.path + '  (' + count + ' 条)')
+    check('  ' + sample.path + ' resolves', count > 0, String(count))
+  }
+
+  console.log('\ncross-repository anchors are not called regressions:')
+  const dirResult = await checkTool.execute({ root: repo, paths: ['ai_core/factors'] })
+  const dirCount = dirResult.verdicts?.[0]?.entries?.length ?? 0
+  console.log('   ' + String(dirResult.verdicts?.[0]?.verdict ?? '?').padEnd(15) + 'ai_core/factors  (' + dirCount + ' 条)')
+  check('directory target matches directory anchors', dirCount > 0, String(dirCount))
+  check('anchors absent from this repo are foreign, not rollback-risk', dirResult.verdicts?.[0]?.verdict !== 'rollback-risk', String(dirResult.verdicts?.[0]?.verdict))
+  check('the whole directory is not counted as risky', dirResult.risky === 0, String(dirResult.risky))
+
+  console.log('\nverify on the real ledger:')
+  const verified = await verifyTool.execute({ root: repo })
+  const unverifiable = verified.unverifiable ?? []
+  console.log('   ok=' + verified.ok + '  checked=' + verified.checked + '  missing=' + verified.missing.length + '  unverifiable=' + unverifiable.length)
+  check('verify returns a message', typeof verified.message === 'string' && verified.message.length > 0)
+  check('cross-repo anchors are reported as unverifiable', unverifiable.length >= 1, String(unverifiable.length))
+  check(
+    'cross-repo anchors are not reported as missing',
+    !verified.missing.some((line) => String(line).includes('ai_core')),
+    JSON.stringify(verified.missing.filter((line) => String(line).includes('ai_core')).slice(0, 2)),
   )
-  const pending = JSON.parse(pRes.collected.body)
-  check('pending filter matches status count', pending.entries.length === status.pendingCount, pending.entries.length + ' vs ' + status.pendingCount)
-  check('every pending entry has a why', pending.entries.every((e) => e.why && e.why.length > 0), JSON.stringify(pending.entries.filter((e) => !e.why).map((e) => e.id)))
 
   console.log('')
-  console.log(failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED')
-  process.exit(failures === 0 ? 0 : 1)
+  if (failures === 0) {
+    console.log('ALL CHECKS PASSED')
+    process.exit(0)
+  }
+  console.log(failures + ' CHECK(S) FAILED')
+  process.exit(1)
 }
 
 main().catch((cause) => {
-  console.log('HARNESS CRASHED: ' + (cause && cause.stack ? cause.stack : cause))
+  console.log('TEST HARNESS CRASHED: ' + (cause && cause.stack ? cause.stack : cause))
   process.exit(1)
 })

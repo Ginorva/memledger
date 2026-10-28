@@ -81,8 +81,8 @@ async function main() {
   }
   console.log('registration:')
   check('apply does not throw', applyError === null, applyError && applyError.message)
-  check('registers four tools', ctx.registered.size === 4, String(ctx.registered.size))
-  for (const name of ['ledger_bootstrap', 'ledger_search', 'ledger_add', 'ledger_verify']) {
+  check('registers five tools', ctx.registered.size === 5, String(ctx.registered.size))
+  for (const name of ['ledger_check', 'ledger_bootstrap', 'ledger_search', 'ledger_add', 'ledger_verify']) {
     const spec = ctx.registered.get(name)
     check(name + ' registered', spec !== undefined)
     check(name + ' has a description', typeof spec?.description === 'string' && spec.description.length > 20)
@@ -185,7 +185,11 @@ async function main() {
   check('checked at least one anchor', verified.checked >= 1, String(verified.checked))
   check('no missing anchors', Array.isArray(verified.missing) && verified.missing.length === 0, JSON.stringify(verified.missing))
 
-  // A landed anchor that no longer exists must be reported.
+  // A landed anchor whose file vanished must be reported — and the distinction
+  // matters: the directory has to exist here for this to count as a regression.
+  // A missing top directory means the anchor points into another repository and
+  // is merely unverifiable, not dead.
+  mkdirSync(join(REPO, 'gone'), { recursive: true })
   const vanished = await add.execute({
     root: REPO,
     title: '指向一个已被删除的文件',

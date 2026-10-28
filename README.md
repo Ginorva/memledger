@@ -1,28 +1,33 @@
 # MemLedger (`dsh-memledger`)
 
-**基于 Mem0 记忆网络的 DeepSeek Harness 智能变更台账与决策守卫。**
+**DeepSeek Harness 的决策台账工具：改之前查重，改之后沉淀「为什么」。**
 
-> 解决长线项目中 AI 最致命的“反复横跳、改回历史、健忘重修”问题：改动自动归档、决策因果沉淀、杜绝代码倒车。
+> 目标只有一个——**别做重复无用功**。同一处代码被修了三次、上次修好的又被改回去、三个月前决定「不做」的事今天从头再议，这些才是长线项目最贵的损耗。
+>
+> 这个插件没有界面。它只有五个工具，嵌在你本来就有的开发流程里。
 
 ---
 
-## 🌟 核心特性
+## 🤖 五个工具
 
-1. **Mem0 驱动的动态认知记忆**：
-   - 区别于传统死板的纯文本或 SQL 关系表，采用 Mem0 的自适应实体、决策与因果抽取；
-   - 自动合并与冲突消解：新决策推翻旧决策时，自动更新记忆图谱，解决台账堆积膨胀。
-2. **代码锚点（Code Anchor）物理拦截**：
-   - 记忆挂钩具体的代码文件与符号（如 `core/exec_caliber.py::gate_filter`）；
-   - 在 AI 意图修改历史敏感代码前，自动唤醒前置记忆并告警拦截。
-3. **人类与 Agent 双轨视图（Dual-View）**：
-   - **人类视图**：自动同步导出 `docs/变更台账.md`，兼容标准的 12 项固定字段，Git 审阅一目了然；
-   - **Agent 视图**：内置原生工具 `ledger_search`、`ledger_add`、`ledger_verify`，毫秒级意图检索。
-4. **两轨冷启动（新老项目无缝适配）**：
-   - **轨 A（已有台账）**：一键清洗导入历史文档；
-   - **轨 B（零文档老项目）**：全自动扫描 Git 提交历史（`git log --grep="fix"`）逆向生成初始台账。
-5. **DSH 原生看板**：
-   - 在会话视图切换器里多出一个 **「台账」** 页签（`conversation.view` 插槽），带关键词检索与「仅看未决」过滤；
-   - 未决事项（未做/搁置/待验证/已回退）红标，已落地绿标，代码锚点高亮可直接定位。
+| 工具 | 什么时候用 | 回答什么 |
+|---|---|---|
+| **`ledger_check`** | **改动之前**（最重要） | 这段代码做过没有？当初为什么？上次的修复还在不在？ |
+| `ledger_search` | 想查历史时 | 按关键词 / 错误特征 / 代码锚点检索，未决条目排最前 |
+| `ledger_add` | 改动之后 | 把这次决策记下来，尤其是「决定不做」的那些 |
+| `ledger_verify` | 想体检时 | 已落地条目的代码文件是否还在（防倒车全量扫描） |
+| `ledger_bootstrap` | 新项目接入 | 从 Git 历史或已有文档生成初版台账 |
+
+### `ledger_check` 的五种判定
+
+| 判定 | 含义 | 你该做什么 |
+|---|---|---|
+| `rollback-risk` | 当初的修复已经不在文件里了 | ⚠️ 很可能在重踩同一个坑 |
+| `repeated-repair` | 同一处已经落地修过多次 | ⚠️ 先读历次「为什么」，别做第四次 |
+| `already-done` | 已落地且锚点存活 | 很可能不用做 |
+| `shelved` | 曾决定不做 | 先看重启条件是否已满足 |
+| `foreign-anchor` | 锚点指向别的仓，本仓无法判断 | 去那个仓查 |
+| `unrecorded` | 无记录，新场景 | 动手，做完记得 `ledger_add` |
 
 ---
 
@@ -45,56 +50,36 @@
 
 ---
 
-## 🔌 集成契约（改代码前先看这节）
+## 🧭 为什么没有界面
 
-这个插件由**两半**组成，两半都必须按下面的形状写，任何一半形状不对都会让宿主加载失败。
+有过一版 `conversation.view` 看板，已删除。原因是它换不来迭代质量：能看 ≠ 会去改之前查。而它带来的成本是实打实的——多一半客户端代码、多一半加载失败面（前面几次插件相关的故障全出在客户端那一半，工具那一半一次没出事）。
+
+台账的价值发生在**动手之前的那一秒**，那一刻不需要仪表盘，需要一个能回答"这做过没有"的工具。
+
+---
+
+## 🔌 集成契约（改代码前先看这节）
 
 ### 宿主半 `lib/index.js`
 
 ```js
 export const name = 'dsh-memledger'
-export const inject = ['webServer']          // 服务名，不是包名
-export function apply(ctx) {
-  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path, handler }), 'label')
-}
+export const inject = ['tools']        // 服务名，不是包名
+export function apply(ctx) { /* 只做一件事：注册工具 */ }
 ```
 
-对外提供两个**只读**路由：
+只依赖 `tools` 一个服务。没有 HTTP 路由，没有客户端一半，所以没有"加载器 404"或"插槽不存在"这类失败面。
 
-| 路由 | 说明 |
-|---|---|
-| `GET /api/memledger/status` | 条目总数、未决数、台账路径、是否存在 |
-| `GET /api/memledger/entries?q=&status=&session=&root=` | 解析后的台账条目；`status=pending` 只看未决 |
-
-**根目录怎么定**（优先级从高到低，响应里的 `rootSource` 会告诉你走了哪一条）：
-
-1. `?root=` —— 调用方显式钉死某个工作区，**权威，不再回退**，避免两个工作区互相串数据；
-2. `?session=` 对应会话的 `header.cwd` —— 页签把当前 `sessionId` 传下来，先查 `ctx.sessions.get(id)`（活会话），再退到 `ctx.sessionQuery.readSession(id)`（已归档会话）；
-3. `MEMLEDGER_ROOT` 环境变量；
-4. 宿主 cwd，再向上 6 层找 `docs/变更台账.md`。
-
-> ⚠️ 别拿宿主 `process.cwd()` 当默认值就完事。DSH 宿主是从 profile 目录启动的，cwd 会稳定指向 `~/.dsh/profiles/desktop`，于是**无论你打开哪个项目都显示"没有台账条目"**。这就是必须走会话 cwd 的原因。
-
-### 客户端半 `lib/client.js`
+### 工具注册形状（照 `dsh-unlag` 这个真实可用的插件抄）
 
 ```js
-window.__ModuleLoader__.load({
-  id: 'dsh-memledger',
-  factory: (require) => {
-    const React = require('react')
-    return {
-      inject: ['slots'],                     // 服务名，不是包名
-      apply(ctx) {
-        const slots = ctx.get('slots')       // 不是 ctx.slots
-        slots.inject('conversation.view', () =>
-          slots.register({ name: 'conversation.view', id: 'memledger', order: 120, label: () => '台账' }, View))
-      },
-    }
-  },
-})
+ctx.effect(() => tools.register({
+  name, description,
+  parameters: { type: 'object', properties, additionalProperties: false },
+  output: { schema, render },
+  execute: async (args) => value,
+}, label))
 ```
-
-> ⚠️ 两个最常见的坑：`inject` 写的是**服务名**（`slots` / `webServer`），不是 `@deepseek-ai/...` 包名；取服务必须用 `ctx.get('slots')`，写成 `ctx.slots` 会拿到 `undefined` 然后**静默不渲染**——不报错，但界面上什么都不会出现。
 
 ### `cordis.patch.yml`
 
@@ -104,11 +89,31 @@ window.__ModuleLoader__.load({
       name: dsh-memledger
 ```
 
-> ⚠️ `id` 必须等于 `lib/index.js` 导出的 `name`，`name` 才是包名（`dsh-context`、`dsh-unlag` 都是这个写法；`dshmarket` 的 `id: dsh-market` 与导出名一致、`name: dshmarket` 才是包名）。对不齐就会出现"启用后变成空指向条目"的故障。
+> ⚠️ `id` 必须等于 `lib/index.js` 导出的 `name`，`name` 才是包名。
 >
-> ⚠️ 这段必须有。它负责把 `dsh-memledger` 真正插进加载器树；缺了它，插件管理器"启用"时写入的 `- id: dsh-memledger` 就会变成**空指向条目**，**DSH 下次启动直接崩溃**。
+> ⚠️ 这段必须有。缺了它，插件管理器"启用"时写入的 `- id: dsh-memledger` 会变成**空指向条目**，**DSH 下次启动直接崩溃**。
 >
-> ⚠️ 不要在 profile 自己的 `cordis.patch.yml` 里手写这个条目——它由 bundle 提供。两边都写会变成重复挂载。
+> ⚠️ 不要在 profile 自己的 `cordis.patch.yml` 里手写这个条目——它由 bundle 提供，两边都写会重复挂载。
+
+---
+
+## 🔍 锚点解析：三态判定
+
+真实台账的锚点比想象中脏。同一条目里可能写多个路径（`；` 分隔）、包反引号、带中文前缀（`引擎 ...`）、甚至只写散文（`（无代码改动）...`）。所以解析器会从一段文本里抽出所有像路径的 token。
+
+判定是三态，不是简单的"存在/不存在"：
+
+| 状态 | 条件 | 含义 |
+|---|---|---|
+| `alive` | 任一命名路径存在 | 修复还在 |
+| `dead` | 某命名路径的**顶层目录存在**、但该路径不存在 | 真被删/改名 → 倒车风险 |
+| `unknown` | 连顶层目录都不存在 | 指向别的仓，本仓无权判断 |
+
+`unknown` 这一态是必要的：双仓项目里包装仓的台账会记 `ai_core/...`（引擎仓路径），若一律判"缺失"，`ledger_verify` 每次都会报一堆假警报——**一个爱喊狼来了的检查，最后一定被无视**。
+
+真实数据效果（`Omw_quant_agent`，69 条）：`verify` 从「29 条缺失」修正为「36 存活 / 3 真缺失 / 8 跨仓无法核验」。
+
+> 已知边界：两个仓都有 `scripts/` 这种同名目录时，存在性检查无法判断锚点指的是哪个仓，仍可能误判。要彻底解决需要给 `ledger_verify` 传入仓名→路径映射。
 
 ---
 
@@ -120,44 +125,24 @@ window.__ModuleLoader__.load({
 dsh plugin --profile <profile> add dsh-memledger
 ```
 
-**验证（不碰 profile，纯本地）**：
+### 验证（不碰 profile，纯本地）
 
 ```bash
 npm test
 ```
 
-三组冒烟测试，共 **111 项断言**：
+| 套件 | 覆盖 |
+|---|---|
+| `test/tools-smoke.mjs` | 五个工具注册、生成不覆盖已有台账、校验拦截、锚点体检 |
+| `test/check-smoke.mjs` | `ledger_check` 五种判定、路径归一化、跨仓判定、目录级锚点 |
 
-| 套件 | 断言 | 覆盖 |
-|---|---|---|
-| `test/host-smoke.mjs` | 31 | 模块形状、四种根目录解析、跨工作区不串数据、两个路由的真实响应 |
-| `test/client-smoke.mjs` | 24 | `__ModuleLoader__` 契约、`ctx.get('slots')`、插槽注册、`sessionId` 注入 |
-| `test/tools-smoke.mjs` | 56 | 四个工具真的注册上、生成不覆盖已有台账、校验拦截、锚点体检 |
-
-真实数据另有一组（16 项，需指定仓库）：
+真实数据另有一组（需指定仓库）：
 
 ```bash
 node test/real-ledger.mjs /path/to/repo
 ```
 
----
-
-## 🤖 Agent 工具
-
-装好并重启后，会话里可以直接让我调用这四个工具（无需你手敲命令）：
-
-| 工具 | 用途 |
-|---|---|
-| `ledger_bootstrap` | 从 Git 历史或已有文档生成台账。**必须显式传 `root`**；已存在台账时默认拒绝覆盖，除非 `force: true` |
-| `ledger_search` | 改动前查账：按关键词 / 错误特征 / 代码锚点检索，未决条目排最前 |
-| `ledger_add` | 收尾入册一条决策；未落地状态必须有实质性的「为什么」 |
-| `ledger_verify` | 锚点体检：已落地条目的代码文件若消失，说明历史修复可能被改没了 |
-
-典型的实验方式，直接在会话里说：
-
-> 「用 MemLedger 给这个项目从 Git 历史生成一版台账」
-
-> ⚠️ `ledger_bootstrap` 对**已有台账**的仓库会拒绝执行（返回已有条数）。这是故意的：脚手架会整篇重写文件，几十条真实决策不该被一次工具调用丢掉。真要重建才传 `force: true`。
+这组会测两个关键指标：**覆盖率**（多少条目能解析出可用路径）和 **召回率**（拿条目自己的路径去 `ledger_check`，能否把它找回来）。召回率低于 100% 就是危险信号——那意味着工具会对"做过的事"回答"没做过"。
 
 ### 想先看效果，不动真实项目
 
@@ -165,13 +150,13 @@ node test/real-ledger.mjs /path/to/repo
 node test/demo.mjs --keep
 ```
 
-会造一个临时仓库（三次 `fix:` 提交 + 一次 docs 提交），然后依次跑：生成台账 → 验证拒绝覆盖 → 按「超时」检索 → 入册一条搁置决策 → 只看未决 → 锚点体检。`--keep` 保留仓库，方便你直接打开生成的 `docs/变更台账.md` 看排版。
+会造一个临时仓库（三次 `fix:` 提交 + 一次 docs 提交），然后依次跑：生成台账 → 验证拒绝覆盖 → 按关键词检索 → 入册一条搁置决策 → 只看未决 → 锚点体检。
 
 ---
 
-## ⚠️ 当前边界
+## ⚠️ 当前边界与不做什么
 
-- 看板是**只读**的：能检索、能过滤，暂不提供从界面写入条目的路由。
-- 条目的写入目前走 Agent 工具（`ledger_add`）或直接编辑 `docs/变更台账.md`。
-- `memory/` 与 Mem0 图谱侧仍是本地启发式实现，未接外部向量库。
-
+- **不自动写条目**。「为什么」只能来自改动发生时仍在上下文里的人或模型，事后从 commit message 反推出来的是猜测。一份会说谎的台账比没有台账更危险。
+- **不自动覆盖**。`ledger_bootstrap` 对已有台账默认拒绝，除非 `force: true`。
+- **不做定时整理**。台账是 append-only，能自动的「整理」只有重建索引（入册时已自动做）和锚点体检。
+- **不依赖 Git**。`ledger_add` / `ledger_search` / `ledger_verify` 纯文件系统操作。只有 `ledger_bootstrap` 的回溯历史需要 Git。
