@@ -126,13 +126,38 @@ dsh plugin --profile <profile> add dsh-memledger
 npm test
 ```
 
-会跑两组冒烟测试：宿主端的模块形状 + 两个路由的真实请求响应（含四种根目录解析路径），客户端端的 `__ModuleLoader__` 契约 + 插槽注册。全部 57 项断言必须绿。
+三组冒烟测试，共 **111 项断言**：
+
+| 套件 | 断言 | 覆盖 |
+|---|---|---|
+| `test/host-smoke.mjs` | 31 | 模块形状、四种根目录解析、跨工作区不串数据、两个路由的真实响应 |
+| `test/client-smoke.mjs` | 24 | `__ModuleLoader__` 契约、`ctx.get('slots')`、插槽注册、`sessionId` 注入 |
+| `test/tools-smoke.mjs` | 56 | 四个工具真的注册上、生成不覆盖已有台账、校验拦截、锚点体检 |
 
 真实数据另有一组（16 项，需指定仓库）：
 
 ```bash
 node test/real-ledger.mjs /path/to/repo
 ```
+
+---
+
+## 🤖 Agent 工具
+
+装好并重启后，会话里可以直接让我调用这四个工具（无需你手敲命令）：
+
+| 工具 | 用途 |
+|---|---|
+| `ledger_bootstrap` | 从 Git 历史或已有文档生成台账。**必须显式传 `root`**；已存在台账时默认拒绝覆盖，除非 `force: true` |
+| `ledger_search` | 改动前查账：按关键词 / 错误特征 / 代码锚点检索，未决条目排最前 |
+| `ledger_add` | 收尾入册一条决策；未落地状态必须有实质性的「为什么」 |
+| `ledger_verify` | 锚点体检：已落地条目的代码文件若消失，说明历史修复可能被改没了 |
+
+典型的实验方式，直接在会话里说：
+
+> 「用 MemLedger 给这个项目从 Git 历史生成一版台账」
+
+> ⚠️ `ledger_bootstrap` 对**已有台账**的仓库会拒绝执行（返回已有条数）。这是故意的：脚手架会整篇重写文件，几十条真实决策不该被一次工具调用丢掉。真要重建才传 `force: true`。
 
 ---
 
