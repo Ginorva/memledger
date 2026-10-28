@@ -64,9 +64,16 @@ export function apply(ctx) {
 | 路由 | 说明 |
 |---|---|
 | `GET /api/memledger/status` | 条目总数、未决数、台账路径、是否存在 |
-| `GET /api/memledger/entries?q=&status=&root=` | 解析后的台账条目；`status=pending` 只看未决 |
+| `GET /api/memledger/entries?q=&status=&session=&root=` | 解析后的台账条目；`status=pending` 只看未决 |
 
-`root` 参数是**权威**的：显式指定就只用它，不会串到别的工作区。不传时依次回退到 `MEMLEDGER_ROOT` 环境变量、宿主 cwd、向上 6 层目录。
+**根目录怎么定**（优先级从高到低，响应里的 `rootSource` 会告诉你走了哪一条）：
+
+1. `?root=` —— 调用方显式钉死某个工作区，**权威，不再回退**，避免两个工作区互相串数据；
+2. `?session=` 对应会话的 `header.cwd` —— 页签把当前 `sessionId` 传下来，先查 `ctx.sessions.get(id)`（活会话），再退到 `ctx.sessionQuery.readSession(id)`（已归档会话）；
+3. `MEMLEDGER_ROOT` 环境变量；
+4. 宿主 cwd，再向上 6 层找 `docs/变更台账.md`。
+
+> ⚠️ 别拿宿主 `process.cwd()` 当默认值就完事。DSH 宿主是从 profile 目录启动的，cwd 会稳定指向 `~/.dsh/profiles/desktop`，于是**无论你打开哪个项目都显示"没有台账条目"**。这就是必须走会话 cwd 的原因。
 
 ### 客户端半 `lib/client.js`
 
@@ -119,7 +126,13 @@ dsh plugin --profile <profile> add dsh-memledger
 npm test
 ```
 
-会跑两组冒烟测试：宿主端的模块形状 + 两个路由的真实请求响应，客户端端的 `__ModuleLoader__` 契约 + 插槽注册。全部 44 项断言必须绿。
+会跑两组冒烟测试：宿主端的模块形状 + 两个路由的真实请求响应（含四种根目录解析路径），客户端端的 `__ModuleLoader__` 契约 + 插槽注册。全部 57 项断言必须绿。
+
+真实数据另有一组（16 项，需指定仓库）：
+
+```bash
+node test/real-ledger.mjs /path/to/repo
+```
 
 ---
 

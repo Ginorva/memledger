@@ -3,6 +3,10 @@
 // Loads lib/index.js under plain Node, runs apply() against a fake cordis
 // context, then drives the two registered routes with fake Node req/res
 // objects against a throwaway ledger. No DSH profile is touched.
+//
+// The workspace-resolution checks are the point: the host runs from the profile
+// directory, so a cwd-based guess reports an empty ledger no matter which
+// project is open. `?session=` must beat every other strategy.
 
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -10,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = join(fileURLToPath(new URL('..', import.meta.url)))
 const FIXTURE = join(ROOT, '.tmp-test')
+const OTHER = join(FIXTURE, 'other-workspace')
 
 const LEDGER = `# 项目变更台账（append-only）
 
@@ -51,6 +56,28 @@ const LEDGER = `# 项目变更台账（append-only）
 <!-- 条目:END -->
 `
 
+const OTHER_LEDGER = `# 项目变更台账（append-only）
+
+<!-- 条目:BEGIN -->
+
+### CL-20261028-09 · 另一个工作区的条目
+
+- **日期**：2026-10-28
+- **类型**：修复
+- **状态**：已落地
+- **仓**：别的仓
+- **背景**：证明会话 cwd 生效
+- **改动**：改了一处
+- **为什么**：这条只应出现在 OTHER 里
+- **取舍**：无
+- **锚点**：other/file.py
+- **commit**：def5678
+- **验收**：无
+- **关键词**：另一个工作区
+
+<!-- 条目:END -->
+`
+
 let failures = 0
 function check(label, condition, detail) {
   if (condition) {
@@ -75,19 +102,11 @@ function fakeRes() {
   }
 }
 
-async function main() {
-  rmSync(FIXTURE, { recursive: true, force: true })
-  mkdirSync(join(FIXTURE, 'docs'), { recursive: true })
-  writeFileSync(join(FIXTURE, 'docs', '变更台账.md'), LEDGER, 'utf-8')
-
-  const module = await import(pathToFileURL(join(ROOT, 'lib', 'index.js')).href)
-  console.log('module shape:')
-  check('exports name', module.name === 'dsh-memledger', module.name)
-  check('inject declares webServer', Array.isArray(module.inject) && module.inject.includes('webServer'), JSON.stringify(module.inject))
-  check('apply is a function', typeof module.apply === 'function')
-
+/** A cordis-like context: services through ctx.get, effects run eagerly. */
+function fakeCtx(services) {
   const routes = new Map()
-  const ctx = {
+  return {
+    routes,
     webServer: {
       register(route) {
         routes.set(route.path, route.handler)
@@ -97,8 +116,51 @@ async function main() {
     effect(fn) {
       return fn()
     },
+    get(name, strict) {
+      const service = services.get(name)
+      if (service === undefined && strict !== false) throw new Error('missing service: ' + name)
+      return service
+    },
   }
+}
 
+async function call(ctx, path, query = {}) {
+  const url = new URL(path, 'http://127.0.0.1')
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) url.searchParams.set(key, value)
+  }
+  const response = fakeRes()
+  await ctx.routes.get(path)({ url: url.pathname + url.search }, response)
+  return { status: response.collected.status, headers: response.collected.headers, body: JSON.parse(response.collected.body) }
+}
+
+async function main() {
+  rmSync(FIXTURE, { recursive: true, force: true })
+  mkdirSync(join(FIXTURE, 'docs'), { recursive: true })
+  writeFileSync(join(FIXTURE, 'docs', '变更台账.md'), LEDGER, 'utf-8')
+  mkdirSync(join(OTHER, 'docs'), { recursive: true })
+  writeFileSync(join(OTHER, 'docs', '变更台账.md'), OTHER_LEDGER, 'utf-8')
+
+  const module = await import(pathToFileURL(join(ROOT, 'lib', 'index.js')).href)
+  console.log('module shape:')
+  check('exports name', module.name === 'dsh-memledger', module.name)
+  check('inject declares webServer', module.inject.includes('webServer'), JSON.stringify(module.inject))
+  check('inject declares sessions', module.inject.includes('sessions'), JSON.stringify(module.inject))
+  check('inject declares sessionQuery', module.inject.includes('sessionQuery'), JSON.stringify(module.inject))
+  check('apply is a function', typeof module.apply === 'function')
+
+  // Live session 'live-1' sits in FIXTURE; 'live-2' sits in OTHER.
+  const liveSessions = new Map([
+    ['live-1', { header: { id: 'live-1', cwd: FIXTURE } }],
+    ['live-2', { header: { id: 'live-2', cwd: OTHER } }],
+  ])
+  const restored = { 'restored-1': { header: { id: 'restored-1', cwd: OTHER } } }
+  const services = new Map([
+    ['sessions', { get: (id) => liveSessions.get(id) }],
+    ['sessionQuery', { readSession: async (id) => restored[id] }],
+  ])
+
+  const ctx = fakeCtx(services)
   console.log('apply():')
   let applyError = null
   try {
@@ -107,68 +169,64 @@ async function main() {
     applyError = cause
   }
   check('apply does not throw', applyError === null, applyError && applyError.message)
-  check('registered status route', routes.has('/api/memledger/status'))
-  check('registered entries route', routes.has('/api/memledger/entries'))
+  check('registered status route', ctx.routes.has('/api/memledger/status'))
+  check('registered entries route', ctx.routes.has('/api/memledger/entries'))
 
-  console.log('missing webServer service:')
+  console.log('apply() when webServer is absent:')
   let guarded = false
   try {
-    module.apply({ effect() {} })
+    module.apply({ effect() {}, get: () => undefined })
   } catch {
     guarded = true
   }
-  check('apply throws a clear error when webServer is absent', guarded)
+  check('throws a clear error', guarded)
 
-  process.env.MEMLEDGER_ROOT = FIXTURE
+  console.log('root resolution - explicit ?root= wins:')
+  const explicit = await call(ctx, '/api/memledger/status', { root: FIXTURE })
+  check('source is query', explicit.body.rootSource === 'query', explicit.body.rootSource)
+  check('totalCount = 2', explicit.body.totalCount === 2, String(explicit.body.totalCount))
+  check('pendingCount = 1', explicit.body.pendingCount === 1, String(explicit.body.pendingCount))
 
-  console.log('GET /status:')
-  const statusRes = fakeRes()
-  await routes.get('/api/memledger/status')({ url: '/api/memledger/status?root=' + encodeURIComponent(FIXTURE) }, statusRes)
-  const statusBody = JSON.parse(statusRes.collected.body)
-  check('status 200', statusRes.collected.status === 200, String(statusRes.collected.status))
-  check('status hasLedger', statusBody.hasLedger === true)
-  check('status totalCount = 2', statusBody.totalCount === 2, String(statusBody.totalCount))
-  check('status pendingCount = 1', statusBody.pendingCount === 1, String(statusBody.pendingCount))
-  check('status sets no-store', String(statusRes.collected.headers['Cache-Control']).includes('no-store'))
+  console.log('root resolution - ?session= beats the guessed cwd:')
+  const viaSession = await call(ctx, '/api/memledger/entries', { session: 'live-1' })
+  check('source is session', viaSession.body.rootSource === 'session', viaSession.body.rootSource)
+  check('root is the session cwd', viaSession.body.root === FIXTURE, viaSession.body.root)
+  check('returned the session workspace ledger', viaSession.body.entries.length === 2, String(viaSession.body.entries.length))
 
-  console.log('GET /entries (all):')
-  const allRes = fakeRes()
-  await routes.get('/api/memledger/entries')({ url: '/api/memledger/entries?root=' + encodeURIComponent(FIXTURE) }, allRes)
-  const allBody = JSON.parse(allRes.collected.body)
-  check('entries 200', allRes.collected.status === 200, String(allRes.collected.status))
-  check('entries returns 2', allBody.entries.length === 2, String(allBody.entries.length))
-  check('entry carries anchor', allBody.entries.some((e) => String(e.anchor).includes('lock.py')))
+  const otherSession = await call(ctx, '/api/memledger/entries', { session: 'live-2' })
+  check('a second session resolves its own workspace', otherSession.body.root === OTHER, otherSession.body.root)
+  check('and returns that workspace entry', otherSession.body.entries.length === 1, String(otherSession.body.entries.length))
+  check('not the first workspace entries', otherSession.body.entries[0]?.anchor === 'other/file.py', String(otherSession.body.entries[0]?.anchor))
 
-  console.log('GET /entries?q=闸门:')
-  const qRes = fakeRes()
-  await routes.get('/api/memledger/entries')(
-    { url: '/api/memledger/entries?q=' + encodeURIComponent('闸门') + '&root=' + encodeURIComponent(FIXTURE) },
-    qRes,
-  )
-  const qBody = JSON.parse(qRes.collected.body)
-  check('query narrows to 1', qBody.entries.length === 1, String(qBody.entries.length))
-  check('query hit is the gate entry', String(qBody.entries[0]?.id).endsWith('-01'), String(qBody.entries[0]?.id))
+  const restoredSession = await call(ctx, '/api/memledger/entries', { session: 'restored-1' })
+  check('a restored session falls back to sessionQuery', restoredSession.body.root === OTHER, restoredSession.body.root)
+  check('restored session still resolves by session', restoredSession.body.rootSource === 'session', restoredSession.body.rootSource)
 
-  console.log('GET /entries?status=pending:')
-  const pRes = fakeRes()
-  await routes.get('/api/memledger/entries')(
-    { url: '/api/memledger/entries?status=pending&root=' + encodeURIComponent(FIXTURE) },
-    pRes,
-  )
-  const pBody = JSON.parse(pRes.collected.body)
-  check('pending filters to 1', pBody.entries.length === 1, String(pBody.entries.length))
-  check('pending hit is the shelved entry', pBody.entries[0]?.status === '搁置', pBody.entries[0]?.status)
+  const unknownSession = await call(ctx, '/api/memledger/entries', { session: 'nope' })
+  check('an unknown session does not claim session source', unknownSession.body.rootSource !== 'session', unknownSession.body.rootSource)
 
-  console.log('GET /entries on a root with no ledger:')
-  const emptyRes = fakeRes()
-  const emptyRoot = join(FIXTURE, 'empty')
-  mkdirSync(emptyRoot, { recursive: true })
-  await routes.get('/api/memledger/entries')(
-    { url: '/api/memledger/entries?root=' + encodeURIComponent(emptyRoot) },
-    emptyRes,
-  )
-  const emptyBody = JSON.parse(emptyRes.collected.body)
-  check('empty root returns 200 with no entries', emptyRes.collected.status === 200 && emptyBody.entries.length === 0)
+  console.log('entries:')
+  const all = await call(ctx, '/api/memledger/entries', { root: FIXTURE })
+  check('HTTP 200', all.status === 200, String(all.status))
+  check('returns 2', all.body.entries.length === 2, String(all.body.entries.length))
+  check('entry carries anchor', all.body.entries.some((e) => String(e.anchor).includes('lock.py')))
+  check('sets no-store', String(all.headers['Cache-Control']).includes('no-store'))
+
+  console.log('search:')
+  const q = await call(ctx, '/api/memledger/entries', { q: '闸门', root: FIXTURE })
+  check('query narrows to 1', q.body.entries.length === 1, String(q.body.entries.length))
+  check('hit is the gate entry', String(q.body.entries[0]?.id).endsWith('-01'), String(q.body.entries[0]?.id))
+
+  const p = await call(ctx, '/api/memledger/entries', { status: 'pending', root: FIXTURE })
+  check('pending filters to 1', p.body.entries.length === 1, String(p.body.entries.length))
+  check('hit is the shelved entry', p.body.entries[0]?.status === '搁置', p.body.entries[0]?.status)
+
+  console.log('empty workspace:')
+  const EMPTY = join(FIXTURE, 'empty')
+  mkdirSync(EMPTY, { recursive: true })
+  const empty = await call(ctx, '/api/memledger/entries', { root: EMPTY })
+  check('200 with no entries', empty.status === 200 && empty.body.entries.length === 0)
+  check('reports the pinned root, not a neighbour', empty.body.root === EMPTY, empty.body.root)
 
   rmSync(FIXTURE, { recursive: true, force: true })
 

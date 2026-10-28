@@ -126,10 +126,16 @@ async function main() {
   check('injected slot is conversation.view', injected[0] === 'conversation.view', String(injected[0]))
   check('registered exactly one component', registered.length === 1, String(registered.length))
   check('register options name matches the slot', registered[0]?.options?.name === 'conversation.view', String(registered[0]?.options?.name))
-  check('register options carry an id', registered[0]?.options?.id === 'memledger', String(registered[0]?.options?.id))
+  check('register options carry an id', registered[0]?.options?.id === 'dsh-memledger', String(registered[0]?.options?.id))
   check('register options carry an order', typeof registered[0]?.options?.order === 'number', String(registered[0]?.options?.order))
   check('register options label is callable', typeof registered[0]?.options?.label === 'function')
   check('label returns a non-empty string', typeof registered[0]?.options?.label() === 'string' && registered[0].options.label().length > 0, String(registered[0]?.options?.label?.()))
+  check('register options expose an inject mapper', typeof registered[0]?.options?.inject === 'function')
+  check(
+    'inject passes the open session down',
+    registered[0]?.options?.inject?.('session-abc')?.sessionId === 'session-abc',
+    JSON.stringify(registered[0]?.options?.inject?.('session-abc')),
+  )
   check('component is a function', typeof registered[0]?.Component === 'function')
   check('styles were inserted', styleTags.length === 1, String(styleTags.length))
   check('style tag is tagged with the plugin name', styleTags[0]?.dataset?.plugin === 'dsh-memledger', String(styleTags[0]?.dataset?.plugin))
