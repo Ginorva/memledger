@@ -20,8 +20,9 @@
 4. **两轨冷启动（新老项目无缝适配）**：
    - **轨 A（已有台账）**：一键清洗导入历史文档；
    - **轨 B（零文档老项目）**：全自动扫描 Git 提交历史（`git log --grep="fix"`）逆向生成初始台账。
-5. **DSH Web 原生看板**：
-   - 侧边栏专属台账仪表盘与状态胶囊，直观展示未决事项（未做/搁置/回退）红绿灯与代码直跳。
+5. **DSH 原生看板**：
+   - 在会话视图切换器里多出一个 **「台账」** 页签（`conversation.view` 插槽），带关键词检索与「仅看未决」过滤；
+   - 未决事项（未做/搁置/待验证/已回退）红标，已落地绿标，代码锚点高亮可直接定位。
 
 ---
 
@@ -44,10 +45,83 @@
 
 ---
 
+## 🔌 集成契约（改代码前先看这节）
+
+这个插件由**两半**组成，两半都必须按下面的形状写，任何一半形状不对都会让宿主加载失败。
+
+### 宿主半 `lib/index.js`
+
+```js
+export const name = 'dsh-memledger'
+export const inject = ['webServer']          // 服务名，不是包名
+export function apply(ctx) {
+  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path, handler }), 'label')
+}
+```
+
+对外提供两个**只读**路由：
+
+| 路由 | 说明 |
+|---|---|
+| `GET /api/memledger/status` | 条目总数、未决数、台账路径、是否存在 |
+| `GET /api/memledger/entries?q=&status=&root=` | 解析后的台账条目；`status=pending` 只看未决 |
+
+`root` 参数是**权威**的：显式指定就只用它，不会串到别的工作区。不传时依次回退到 `MEMLEDGER_ROOT` 环境变量、宿主 cwd、向上 6 层目录。
+
+### 客户端半 `lib/client.js`
+
+```js
+window.__ModuleLoader__.load({
+  id: 'dsh-memledger',
+  factory: (require) => {
+    const React = require('react')
+    return {
+      inject: ['slots'],                     // 服务名，不是包名
+      apply(ctx) {
+        const slots = ctx.get('slots')       // 不是 ctx.slots
+        slots.inject('conversation.view', () =>
+          slots.register({ name: 'conversation.view', id: 'memledger', order: 120, label: () => '台账' }, View))
+      },
+    }
+  },
+})
+```
+
+> ⚠️ 两个最常见的坑：`inject` 写的是**服务名**（`slots` / `webServer`），不是 `@deepseek-ai/...` 包名；取服务必须用 `ctx.get('slots')`，写成 `ctx.slots` 会拿到 `undefined` 然后**静默不渲染**——不报错，但界面上什么都不会出现。
+
+### `cordis.patch.yml`
+
+```yaml
+- insert:
+    - id: memledger
+      name: dsh-memledger
+```
+
+> ⚠️ 这段必须有。它负责把 `memledger` 这个 id 真正插进加载器树；缺了它，插件管理器"启用"时写入的 `- id: memledger` 就会变成**空指向条目**，**DSH 下次启动直接崩溃**。
+
+---
+
 ## 🛠️ 安装与使用
 
-在 DSH 插件市场安装，或在你的 profile 目录执行：
+发布到 npm 后，在 DSH 插件市场搜索 `dsh-memledger` 安装，或：
 
 ```bash
-dsh plugin add ./mem-ledger
+dsh plugin --profile <profile> add dsh-memledger
 ```
+
+**验证（不碰 profile，纯本地）**：
+
+```bash
+npm test
+```
+
+会跑两组冒烟测试：宿主端的模块形状 + 两个路由的真实请求响应，客户端端的 `__ModuleLoader__` 契约 + 插槽注册。全部 44 项断言必须绿。
+
+---
+
+## ⚠️ 当前边界
+
+- 看板是**只读**的：能检索、能过滤，暂不提供从界面写入条目的路由。
+- 条目的写入目前走 Agent 工具（`ledger_add`）或直接编辑 `docs/变更台账.md`。
+- `memory/` 与 Mem0 图谱侧仍是本地启发式实现，未接外部向量库。
+

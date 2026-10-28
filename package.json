@@ -4,7 +4,6 @@
   "description": "基于 Mem0 的 DeepSeek Harness 智能记忆台账插件：改动自动归档、决策因果沉淀、杜绝代码倒车与重复修复。",
   "type": "module",
   "main": "lib/index.js",
-  "types": "lib/index.d.ts",
   "files": [
     "lib",
     "locale",
@@ -12,28 +11,56 @@
     "README.md",
     "icon.svg"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/ginorva/mem-ledger.git"
+  },
+  "homepage": "https://gitee.com/ginorva/mem-ledger#readme",
+  "bugs": {
+    "url": "https://gitee.com/ginorva/mem-ledger/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis-plugin",
+    "ledger",
+    "memory",
+    "mem0",
+    "changelog",
+    "decision-log"
+  ],
   "engines": {
     "node": ">=20"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1"
   },
-  "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@types/node": "^24.0.0",
-    "typescript": "^5.6.0"
-  },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "test": "node test/host-smoke.mjs && node test/client-smoke.mjs"
   },
   "license": "MIT",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon.svg": "./icon.svg",
+    "./locale/*": "./locale/*",
+    "./package.json": "./package.json"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-modules"
+      ]
     }
   }
 }
