@@ -186,6 +186,7 @@ async function main() {
     status: '已落地',
     anchor: 'dup.py::f',
     why: '第一次的原因，写清楚。',
+    keywords: ['dup', '幂等'],
   })
   check('first record accepted', first.ok === true, JSON.stringify(first))
   const second = await add.execute({
@@ -212,6 +213,7 @@ async function main() {
     anchor: 'dup.py::f',
     why: '这次与上次不同：上次只补了返回值，这次要改并发路径。',
     force: true,
+    keywords: ['dup', '并发路径'],
   })
   check('force overrides the guard', forced.ok === true, JSON.stringify(forced).slice(0, 120))
 
@@ -222,6 +224,7 @@ async function main() {
     status: '已回退',
     anchor: 'dup.py::f',
     why: '回退是记录结果，不是重复记录同一件事。',
+    keywords: ['dup', '回退'],
   })
   check('a revert is not blocked by the guard', revert.ok === true, JSON.stringify(revert).slice(0, 120))
 
@@ -256,6 +259,7 @@ async function main() {
     status: '已落地',
     anchor: 'gone/never-existed.py::f',
     why: '用来验证锚点体检能发现文件消失。',
+    keywords: ['锚点体检', '文件消失'],
   })
   check('seeded the missing-anchor entry', vanished.ok === true, JSON.stringify(vanished))
   const broken = await verify.execute({ root: REPO })

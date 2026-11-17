@@ -116,7 +116,8 @@ async function main() {
   console.log('repeated-repair:')
   const repeated = await spec.execute({ root: LAB, paths: ['core/backfill.py'] })
   check('verdict is repeated-repair', repeated.verdicts[0]?.verdict === 'repeated-repair', repeated.verdicts[0]?.verdict)
-  check('lists both landed entries', repeated.verdicts[0]?.entries.filter((e) => e.status === '已落地').length === 2, JSON.stringify(repeated.verdicts[0]?.entries.map((e) => e.id)))
+  check('answers with the live round only', repeated.verdicts[0]?.entries.filter((e) => e.status === '已落地').length === 1, JSON.stringify(repeated.verdicts[0]?.entries.map((e) => e.id)))
+  check('folds the replaced round into a count', Array.isArray(repeated.verdicts[0]?.superseded) && repeated.verdicts[0].superseded.includes('CL-20261003-01'), JSON.stringify(repeated.verdicts[0]?.superseded))
 
   console.log('two different symbols in one file is NOT a repeat:')
   touch('core/quiet.py')

@@ -98,6 +98,7 @@ async function main() {
     status: '已落地',
     anchor: 'core/a.py::fn',
     why: '测试用，需求不存在时应拒绝。',
+    keywords: ['孤儿', '需求校验'],
     requirement: 'RQ-19990101-09',
   })
   check('not ok', orphan.ok === false, JSON.stringify(orphan).slice(0, 100))
@@ -111,6 +112,7 @@ async function main() {
     status: '已落地',
     anchor: 'core/a.py::fn',
     why: '空数组是合法持仓状态，不能用长度判定缺失。',
+    keywords: ['空数组', '兜底假数据'],
     requirement: reqA,
   })
   check('ok', first.ok === true, JSON.stringify(first).slice(0, 140))
@@ -134,6 +136,7 @@ async function main() {
     status: '已落地',
     anchor: 'core/a.py::fn',
     why: '第一轮只处理空数组，这一轮补空仓展示。',
+    keywords: ['空仓展示', '清仓'],
     requirement: reqA,
   })
   check('accepted within the same requirement', second.ok === true, JSON.stringify(second).slice(0, 160))
@@ -151,6 +154,7 @@ async function main() {
     status: '已落地',
     anchor: 'core/a.py::fn',
     why: '这确实可能是重复劳动，应被挡回。',
+    keywords: ['重复劳动', '跨需求'],
     requirement: reqB,
   })
   check('refused', blocked.ok === false && blocked.refused === true, JSON.stringify(blocked).slice(0, 160))
@@ -171,6 +175,7 @@ async function main() {
     status: '待验证',
     anchor: 'core/gone.py::fn',
     why: '需要真机确认样式，但锚点文件随后被删：待验证条目不应静默腐烂。',
+    keywords: ['真机截图', '待验证收口'],
     requirement: reqA,
   })
   check('pending entry lands as 待验证', pending.ok === true, JSON.stringify(pending).slice(0, 120))
