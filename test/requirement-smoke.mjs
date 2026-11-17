@@ -83,6 +83,7 @@ async function main() {
   check('file exists', existsSync(join(LAB, 'docs', '需求', reqA + '.md')))
   const reqText = readFileSync(join(LAB, 'docs', '需求', reqA + '.md'), 'utf-8')
   check('keeps the raw ask', reqText.includes('清仓之后宁波港还在面板上'))
+  check('does not quote the template guidance as if the user said it', !reqText.includes('原文照抄'))
   check('records what is explicitly not done', reqText.includes('不处理行情轮询频率'))
 
   const again = await reqTool.execute({ root: LAB, action: 'create', id: reqA, title: '重复' })
