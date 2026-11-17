@@ -19,6 +19,7 @@ const target = join(dir, 'AGENTS.md')
 
 try {
   console.log('fresh creation:')
+  check('rule block stays compact (injected every session)', buildRuleBlock().length <= 1900, String(buildRuleBlock().length))
   const r1 = ensureAgentsRulesInjected(target)
   check('creates new file', r1.ok && r1.updated && r1.reason === 'created')
   check('contains begin marker', readFileSync(target, 'utf-8').includes(BEGIN_MARKER))

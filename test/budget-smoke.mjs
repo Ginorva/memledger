@@ -135,6 +135,26 @@ async function main() {
   const map = ctx.registered.get('ledger_map')
   check('ledger_map registered', map !== undefined)
 
+  /* ---- 3. fixed cost of the tool definitions ---- */
+  console.log('tool definitions stay inside their prompt budget:')
+  let payload = 0
+  for (const [name, spec] of ctx.registered) {
+    payload += name.length + JSON.stringify({ d: spec.description, p: spec.parameters }).length
+  }
+  check('seven tools registered', ctx.registered.size === 7, String(ctx.registered.size))
+  check('descriptions+schemas fit in 4600 chars', payload <= 4600, String(payload))
+
+  /* ---- 4. search answers with recall, not just ids ---- */
+  console.log('ledger_search returns index lines by default:')
+  const search = ctx.registered.get('ledger_search')
+  const found = await search.execute({ root: LAB, query: '测试' })
+  check('finds the fixture entries', found.total >= 3, String(found.total))
+  check('shows titles, not just ids', found.message.includes('的测试条目'), found.message)
+  check('points at detail=true for the why', found.message.includes('detail=true'), found.message)
+  const detailed = await search.execute({ root: LAB, query: '测试', detail: true })
+  check('detail expands the why', detailed.message.includes('为什么:'), detailed.message.slice(0, 200))
+  check('detail stays inside the budget', detailed.message.length <= 1200, String(detailed.message.length))
+
   console.log('large skeleton is folded into an outline:')
   const big = await map.execute({ root: bigRepo, refresh: true })
   check('reports ok', big.ok === true, JSON.stringify(big).slice(0, 200))
