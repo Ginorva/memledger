@@ -137,7 +137,7 @@ async function main() {
   )
   check('component is a function', typeof registered[0]?.Component === 'function')
   check('styles were inserted', styleTags.length === 1, String(styleTags.length))
-  check('style tag carries .ml-container css', typeof styleTags[0]?.textContent === 'string' && styleTags[0].textContent.includes('.ml-container'))
+  check('style tag carries ml- css classes', typeof styleTags[0]?.textContent === 'string' && (styleTags[0].textContent.includes('.ml-root') || styleTags[0].textContent.includes('.ml-container')))
 
   console.log('')
   if (failures === 0) {

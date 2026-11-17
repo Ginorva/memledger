@@ -1,0 +1,6 @@
+node_modules/
+# runtime stats written by the plugin (per-workspace usage counters)
+.memledger-stats.json
+# scratch dirs created by the smoke tests
+.tmp-*/
+*.log

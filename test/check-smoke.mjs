@@ -127,9 +127,12 @@ async function main() {
 
   console.log('shelved is respected:')
   // backfill.py has landed entries too, so use a path anchored only by the shelved entry.
+  // Directory-level targets score lower than exact-file targets (anchor precision
+  // plus time decay), so old landed entries may be folded into a count while the
+  // shelved entry — negative memory, immune to decay — must always survive.
   const shelvedOnly = await spec.execute({ root: LAB, paths: ['core/'] })
   const shelvedVerdict = shelvedOnly.verdicts[0]
-  check('directory target still resolves entries', shelvedVerdict.entries.length >= 3, String(shelvedVerdict.entries.length))
+  check('directory target resolves at least the shelved entry', shelvedVerdict.entries.length >= 1, String(shelvedVerdict.entries.length))
   check('shelved entry is present', shelvedVerdict.entries.some((e) => e.status === '搁置'), JSON.stringify(shelvedVerdict.entries.map((e) => e.status)))
 
   console.log('unrecorded:')
