@@ -138,6 +138,7 @@ async function main() {
   check('accepted within the same requirement', second.ok === true, JSON.stringify(second).slice(0, 160))
   const reqAfter2 = readFileSync(join(LAB, 'docs', '需求', reqA + '.md'), 'utf-8')
   check('both entries are listed', reqAfter2.includes(first.entryId) && reqAfter2.includes(second.entryId))
+  check('sub-items stay in one list', !/- \[[ xX]\] CL-[^\n]*\n\n- \[[ xX]\] CL-/.test(reqAfter2), 'a blank line between items would split the Markdown list')
 
   console.log('a different requirement still blocks:')
   const other = await reqTool.execute({ root: LAB, action: 'create', title: '另一个需求' })
