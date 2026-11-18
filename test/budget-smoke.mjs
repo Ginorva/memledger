@@ -141,8 +141,10 @@ async function main() {
   for (const [name, spec] of ctx.registered) {
     payload += name.length + JSON.stringify({ d: spec.description, p: spec.parameters }).length
   }
-  check('seven tools registered', ctx.registered.size === 7, String(ctx.registered.size))
-  check('descriptions+schemas fit in 4600 chars', payload <= 4600, String(payload))
+  check('eight tools registered', ctx.registered.size === 8, String(ctx.registered.size))
+  // 4600 → 5800 when ledger_suite landed (RQ-20261117-06). The ceiling is a
+  // ratchet, not a slider: a ninth tool has to buy its space inside this number.
+  check('descriptions+schemas fit in 5800 chars', payload <= 5800, String(payload))
 
   /* ---- 4. search answers with recall, not just ids ---- */
   console.log('ledger_search returns index lines by default:')

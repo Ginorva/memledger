@@ -67,6 +67,49 @@ function fakeRequire(id) {
   throw new Error('unexpected require: ' + id)
 }
 
+/* ---------------------------------------------------------- tree helpers -- */
+
+function collectText(node, out = []) {
+  if (node === null || node === undefined || node === false) return out
+  if (typeof node === 'string' || typeof node === 'number') {
+    out.push(String(node))
+    return out
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) collectText(child, out)
+    return out
+  }
+  if (node.children) collectText(node.children, out)
+  return out
+}
+
+function findByName(node, name) {
+  if (!node || typeof node !== 'object') return null
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByName(child, name)
+      if (hit) return hit
+    }
+    return null
+  }
+  if (typeof node.type === 'function' && node.type.name === name) return node
+  return node.children ? findByName(node.children, name) : null
+}
+
+function findByClass(node, className) {
+  if (!node || typeof node !== 'object') return null
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByClass(child, className)
+      if (hit) return hit
+    }
+    return null
+  }
+  const cls = node.props?.className
+  if (typeof cls === 'string' && cls.split(/\s+/).includes(className)) return node
+  return node.children ? findByClass(node.children, className) : null
+}
+
 /* -------------------------------------------------------------------- run -- */
 
 async function main() {
@@ -138,6 +181,94 @@ async function main() {
   check('component is a function', typeof registered[0]?.Component === 'function')
   check('styles were inserted', styleTags.length === 1, String(styleTags.length))
   check('style tag carries ml- css classes', typeof styleTags[0]?.textContent === 'string' && (styleTags[0].textContent.includes('.ml-root') || styleTags[0].textContent.includes('.ml-container')))
+
+  console.log('contract tab renders (🧪 契约跑分):')
+  // The tab state starts as the literal 'dashboard'; swap it for 'suites' so the
+  // contract pane is the one that renders. No hook-order counting involved.
+  const baseUseState = fakeReact.useState
+  fakeReact.useState = (initial) => [initial === 'dashboard' ? 'suites' : initial, () => {}]
+  let tree = null
+  let renderError = null
+  try {
+    tree = registered[0].Component({ sessionId: 's1' })
+  } catch (cause) {
+    renderError = cause
+  } finally {
+    fakeReact.useState = baseUseState
+  }
+  check('component renders without throwing', renderError === null, renderError && renderError.message)
+  const tabTexts = collectText(tree)
+  check('tab bar carries the contract tab', tabTexts.includes('🧪 契约跑分'), JSON.stringify(tabTexts.slice(0, 12)))
+
+  const panel = findByName(tree, 'SuitePanel')
+  check('contract panel is mounted', panel !== null)
+  if (panel !== null) {
+    // 12 条用例 + 1 条停用：超过旧版「只显示前 8 条」的截断上限。
+    const manyCases = []
+    for (let i = 1; i <= 12; i += 1) {
+      manyCases.push({
+        id: 'C-' + String(i).padStart(3, '0'),
+        title: '用例标题 ' + i + '（这条标题故意写得很长，用来验证不再被省略号截断）',
+        covers: ['lib/x.js::f' + i],
+        weight: i % 5 === 0 ? 5 : i % 3 === 0 ? 3 : 1,
+        status: 'active',
+        seenFail: true,
+        last: { ok: i % 4 !== 0, ms: 12 * i, reason: i % 4 === 0 ? '退出码 1（期望 0）' : '' },
+      })
+    }
+    manyCases.push({
+      id: 'C-013',
+      title: '已停用的老用例',
+      covers: [],
+      weight: 1,
+      status: 'retired',
+      seenFail: false,
+      last: null,
+    })
+
+    const fixture = {
+      programs: [{
+        program: 'mem-ledger',
+        description: '决策台账工具',
+        version: 9,
+        drift: false,
+        cases: manyCases,
+        last: { ts: '2026-11-17T08:50:00.000Z', score: 80, passed: 8, total: 10 },
+        history: [
+          { ts: '2026-11-16T08:50:00.000Z', score: 90, passed: 9, total: 10 },
+          { ts: '2026-11-17T08:50:00.000Z', score: 80, passed: 8, total: 10 },
+        ],
+        debts: [{ id: 'CL-20261117-18', title: '收口通道修复' }],
+      }],
+      totalCases: manyCases.length,
+    }
+    const tree2 = panel.type({ data: fixture })
+    const rendered = collectText(tree2)
+    check('shows the program name', rendered.includes('mem-ledger'), JSON.stringify(rendered.slice(0, 10)))
+    check('shows the score', rendered.includes('80'), JSON.stringify(rendered.slice(0, 10)))
+    check('shows a failing case', rendered.includes('失败'), JSON.stringify(rendered.slice(0, 12)))
+    check('shows the contract debt', rendered.some((text) => text.includes('没有用例')), JSON.stringify(rendered.slice(0, 12)))
+    check('empty state is graceful', collectText(panel.type({ data: null })).some((text) => text.includes('暂未连接')))
+
+    console.log('contract cases are shown in full (RQ-20261118-01):')
+    const missing = manyCases.map((c) => c.id).filter((id) => !rendered.includes(id))
+    check('every case id is rendered (no 8-case cap)', missing.length === 0, 'missing: ' + missing.join(','))
+    check('retired case is rendered too', rendered.some((text) => text.includes('停用')), JSON.stringify(rendered.filter((text) => text.includes('停用'))))
+    check('no "…另 N 例" truncation note', !rendered.some((text) => text.includes('另 ') && text.includes('例')))
+    check('case list has its own scroll container', findByClass(tree2, 'ml-cases') !== null)
+    check('case list carries a column header', findByClass(tree2, 'ml-case-head') !== null)
+
+    console.log('weight is readable (RQ-20261118-01):')
+    check('weight column is labelled 权重', rendered.includes('权重'))
+    check('legend explains the weight scale', rendered.some((text) => text.includes('普通用例 1') && text.includes('倒车用例 5')))
+    check('no cryptic w-prefixed weight badge', !rendered.some((text) => /^w\d+$/.test(text.trim())), JSON.stringify(rendered.filter((text) => /^w\d+$/.test(text.trim()))))
+
+    console.log('styles ship the scrollbar rules:')
+    const css = styleTags[0]?.textContent || ''
+    check('css defines .ml-cases scroll area', css.includes('.ml-cases') && css.includes('overflow-y:auto'))
+    check('css defines the weight pill', css.includes('.ml-case-w'))
+    check('css no longer ellipsizes the case title', !/\.ml-case-title\{[^}]*text-overflow:ellipsis/.test(css))
+  }
 
   console.log('')
   if (failures === 0) {

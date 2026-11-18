@@ -81,8 +81,8 @@ async function main() {
   }
   console.log('registration:')
   check('apply does not throw', applyError === null, applyError && applyError.message)
-  check('registers seven tools', ctx.registered.size === 7, String(ctx.registered.size))
-  for (const name of ['ledger_map', 'ledger_check', 'ledger_bootstrap', 'ledger_search', 'ledger_requirement', 'ledger_add', 'ledger_verify']) {
+  check('registers eight tools', ctx.registered.size === 8, String(ctx.registered.size))
+  for (const name of ['ledger_map', 'ledger_check', 'ledger_bootstrap', 'ledger_search', 'ledger_requirement', 'ledger_add', 'ledger_verify', 'ledger_suite']) {
     const spec = ctx.registered.get(name)
     check(name + ' registered', spec !== undefined)
     check(name + ' has a description', typeof spec?.description === 'string' && spec.description.length > 20)
