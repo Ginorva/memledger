@@ -32,7 +32,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test/tools-smoke.mjs && node test/multi-ledger-smoke.mjs && node test/check-smoke.mjs && node test/requirement-smoke.mjs && node test/budget-smoke.mjs && node test/supersede-smoke.mjs && node test/schema-smoke.mjs && node test/rules-smoke.mjs && node test/suite-smoke.mjs && node test/inject-rules-smoke.mjs && node test/client-view-smoke.mjs && node test/dashboard-empty-smoke.mjs"
+    "test": "node test/tools-smoke.mjs && node test/multi-ledger-smoke.mjs && node test/check-smoke.mjs && node test/requirement-smoke.mjs && node test/budget-smoke.mjs && node test/supersede-smoke.mjs && node test/schema-smoke.mjs && node test/fact-claims-smoke.mjs && node test/rules-smoke.mjs && node test/suite-smoke.mjs && node test/inject-rules-smoke.mjs && node test/client-view-smoke.mjs && node test/dashboard-empty-smoke.mjs"
   },
   "license": "MIT",
   "exports": {
