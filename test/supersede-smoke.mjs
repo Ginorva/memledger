@@ -132,9 +132,15 @@ ${ROUNDS.join('')}
   check('marks it as repeatedly repaired', verdict.verdicts[0]?.verdict === 'repeated-repair', verdict.verdicts[0]?.verdict)
   check('message counts the folded rounds', verdict.message.includes('另有 2 轮已被取代'), verdict.message)
 
-  console.log('search still finds the history, and says it is retired:')
-  const found = await search.execute({ root: LAB, query: '测试', limit: 10 })
-  check('old round is still findable', found.entries.some((e) => e.id === 'CL-20261101-01'))
+  console.log('search metabolic pruning (RSI) folds superseded history by default:')
+  const foundDefault = await search.execute({ root: LAB, query: '测试', limit: 10 })
+  check('default search prunes superseded round', !foundDefault.entries.some((e) => e.id === 'CL-20261101-01'))
+  check('default search returns live round', foundDefault.entries.some((e) => e.id === 'CL-20261103-01'))
+  check('default search reports metabolic pruning note', foundDefault.message.includes('代谢系统已自动折叠') && foundDefault.message.includes('all=true'))
+
+  console.log('search with all=true reveals full history and marks superseded entries:')
+  const found = await search.execute({ root: LAB, query: '测试', limit: 10, all: true })
+  check('old round is still findable with all=true', found.entries.some((e) => e.id === 'CL-20261101-01'))
   check('marked as superseded', found.message.includes('已被 CL-20261103-01 取代'), found.message)
 
   console.log('keywords must be a search index, not a genre label:')

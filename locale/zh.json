@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "变更台账 (MemLedger)",
+    "description": "为每个会话装备空间地图与时间台账双闭环。八个 Agent 工具——ledger_map、ledger_check、ledger_add、ledger_search、ledger_verify、ledger_requirement、ledger_suite、ledger_bootstrap——让 AI 无需全盘扫描即可定位代码，改动前检测回滚风险和重复修复，改动后沉淀决策依据。会话视图中的「台账与地图」标签页提供效能总览仪表盘、骨架+台账浏览器和契约跑分面板。激活后自动注入规则到 ~/.dsh/AGENTS.md，零配置即可使用。",
+    "detail": "docs/DETAIL.zh.md"
+  }
+}

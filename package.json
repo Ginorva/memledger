@@ -1,14 +1,17 @@
 {
   "name": "dsh-memledger",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 决策台账工具：改动前查重与倒车预警，改动后沉淀「为什么」，让重复劳动和改回历史不再发生。",
+  "description": "Spatial repo map and temporal change ledger for DeepSeek Harness — rollback detection, duplicate-fix prevention, and decision-rationale persistence across sessions.",
   "type": "module",
   "main": "lib/index.js",
   "files": [
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "icon.svg"
+    "LICENSE",
+    "docs",
+    "icon.svg",
+    "locale"
   ],
   "repository": {
     "type": "git",
@@ -29,10 +32,11 @@
     "agent-memory"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "dsh": "^0.2.3-alpha.2"
   },
   "scripts": {
-    "test": "node test/tools-smoke.mjs && node test/multi-ledger-smoke.mjs && node test/check-smoke.mjs && node test/requirement-smoke.mjs && node test/budget-smoke.mjs && node test/supersede-smoke.mjs && node test/schema-smoke.mjs && node test/fact-claims-smoke.mjs && node test/rules-smoke.mjs && node test/suite-smoke.mjs && node test/inject-rules-smoke.mjs && node test/client-view-smoke.mjs && node test/dashboard-empty-smoke.mjs"
+    "test": "node test/tools-smoke.mjs && node test/multi-ledger-smoke.mjs && node test/check-smoke.mjs && node test/requirement-smoke.mjs && node test/budget-smoke.mjs && node test/supersede-smoke.mjs && node test/schema-smoke.mjs && node test/fact-claims-smoke.mjs && node test/rules-smoke.mjs && node test/suite-smoke.mjs && node test/inject-rules-smoke.mjs && node test/client-view-smoke.mjs && node test/dashboard-empty-smoke.mjs && node test/rsi-smoke.mjs"
   },
   "license": "MIT",
   "exports": {
@@ -41,6 +45,8 @@
     },
     "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
   },

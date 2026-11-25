@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Change ledger (MemLedger)",
+    "description": "Equips every session with a spatial repo map and a temporal change ledger. Eight agent tools — ledger_map, ledger_check, ledger_add, ledger_search, ledger_verify, ledger_requirement, ledger_suite, and ledger_bootstrap — let the agent locate code without scanning, detect rollback risks and duplicate fixes before editing, and persist decision rationale after changes. The \"Ledger & Map\" tab in the session view shows an effectiveness dashboard, a skeleton + ledger browser, and a contract-score panel. Rules are auto-injected into ~/.dsh/AGENTS.md on activation; no manual configuration is needed.",
+    "detail": "docs/DETAIL.md"
+  }
+}

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="640" height="300" rx="12" fill="url(#bg)"/>
+
+  <!-- left panel: Repo Map skeleton -->
+  <rect x="32" y="40" width="260" height="220" rx="8" fill="none" stroke="#334155" stroke-width="1"/>
+  <rect x="32" y="40" width="260" height="30" rx="8" fill="#1e293b"/>
+  <rect x="32" y="69" width="260" height="1" fill="#334155"/>
+  <!-- panel header -->
+  <circle cx="48" cy="55" r="4" fill="#89b4fa"/>
+  <!-- title: code skeleton -->
+  <rect x="58" y="50" width="80" height="10" rx="3" fill="#89b4fa" opacity="0.8"/>
+
+  <!-- file rows -->
+  <rect x="44" y="82" width="6" height="6" rx="1" fill="#a6e3a1" opacity="0.7"/>
+  <rect x="56" y="82" width="120" height="7" rx="2" fill="#475569"/>
+  <rect x="184" y="82" width="30" height="7" rx="2" fill="#334155"/>
+
+  <rect x="44" y="100" width="6" height="6" rx="1" fill="#a6e3a1" opacity="0.7"/>
+  <rect x="56" y="100" width="95" height="7" rx="2" fill="#475569"/>
+  <rect x="160" y="100" width="30" height="7" rx="2" fill="#334155"/>
+
+  <rect x="60" y="116" width="2" height="30" fill="#89b4fa" opacity="0.3"/>
+  <rect x="70" y="118" width="150" height="6" rx="2" fill="#64748b" opacity="0.6"/>
+  <rect x="70" y="130" width="130" height="6" rx="2" fill="#64748b" opacity="0.6"/>
+  <rect x="70" y="142" width="140" height="6" rx="2" fill="#64748b" opacity="0.6"/>
+
+  <rect x="44" y="160" width="6" height="6" rx="1" fill="#a6e3a1" opacity="0.7"/>
+  <rect x="56" y="160" width="110" height="7" rx="2" fill="#475569"/>
+
+  <rect x="44" y="178" width="6" height="6" rx="1" fill="#a6e3a1" opacity="0.7"/>
+  <rect x="56" y="178" width="140" height="7" rx="2" fill="#475569"/>
+  <rect x="204" y="178" width="30" height="7" rx="2" fill="#334155"/>
+
+  <rect x="44" y="196" width="6" height="6" rx="1" fill="#a6e3a1" opacity="0.7"/>
+  <rect x="56" y="196" width="100" height="7" rx="2" fill="#475569"/>
+
+  <!-- right panel: Change Ledger -->
+  <rect x="308" y="40" width="300" height="220" rx="8" fill="none" stroke="#334155" stroke-width="1"/>
+  <rect x="308" y="40" width="300" height="30" rx="8" fill="#1e293b"/>
+  <rect x="308" y="69" width="300" height="1" fill="#334155"/>
+  <!-- panel header -->
+  <circle cx="324" cy="55" r="4" fill="#f38ba8"/>
+  <rect x="334" y="50" width="90" height="10" rx="3" fill="#f38ba8" opacity="0.8"/>
+
+  <!-- entry cards -->
+  <!-- card 1: landed -->
+  <rect x="320" y="80" width="276" height="48" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+  <rect x="332" y="90" width="48" height="14" rx="4" fill="#a6e3a1" opacity="0.15"/>
+  <rect x="338" y="93" width="36" height="8" rx="2" fill="#a6e3a1" opacity="0.8"/>
+  <rect x="386" y="92" width="140" height="8" rx="2" fill="#94a3b8"/>
+  <rect x="332" y="110" width="200" height="6" rx="2" fill="#475569" opacity="0.6"/>
+
+  <!-- card 2: rollback risk -->
+  <rect x="320" y="136" width="276" height="48" rx="6" fill="#1e293b" stroke="#f38ba8" stroke-width="0.8" opacity="0.8"/>
+  <rect x="332" y="146" width="48" height="14" rx="4" fill="#f38ba8" opacity="0.15"/>
+  <rect x="338" y="149" width="36" height="8" rx="2" fill="#f38ba8" opacity="0.8"/>
+  <rect x="386" y="148" width="160" height="8" rx="2" fill="#94a3b8"/>
+  <rect x="332" y="166" width="180" height="6" rx="2" fill="#475569" opacity="0.6"/>
+
+  <!-- card 3: shelved -->
+  <rect x="320" y="192" width="276" height="48" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+  <rect x="332" y="202" width="48" height="14" rx="4" fill="#fde68a" opacity="0.15"/>
+  <rect x="338" y="205" width="36" height="8" rx="2" fill="#fde68a" opacity="0.8"/>
+  <rect x="386" y="204" width="130" height="8" rx="2" fill="#94a3b8"/>
+  <rect x="332" y="222" width="220" height="6" rx="2" fill="#475569" opacity="0.6"/>
+
+  <!-- center connector: the triangle graph (brand motif) -->
+  <circle cx="296" cy="120" r="6" fill="#a6e3a1" opacity="0.5"/>
+  <circle cx="296" cy="180" r="6" fill="#89b4fa" opacity="0.5"/>
+  <circle cx="296" cy="150" r="6" fill="#f38ba8" opacity="0.5"/>
+  <line x1="296" y1="120" x2="296" y2="180" stroke="#cdd6f4" stroke-width="0.8" opacity="0.3"/>
+  <line x1="296" y1="120" x2="296" y2="150" stroke="#cdd6f4" stroke-width="0.8" opacity="0.3"/>
+</svg>

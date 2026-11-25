@@ -191,6 +191,25 @@ pnpm pack
 ```
 重启 DSH 客户端即可畅享完整的“空间地图 + 时间台账”双闭环！
 
+### 💡 针对 DeepSeek 模型环境的推荐配置（防流式 JSON 抖动）
+
+在部分以 DeepSeek 为底模的运行环境中，大模型在单轮生成较长工具调用参数时可能偶发流式 JSON 格式抖动。建议在 DSH 配置中将 `MALFORMED_RESPONSE` 纳入重试白名单，避免偶发抖动导致整轮会话中断：
+
+```yaml
+# 在对应 provider 补丁中增加：
+- patch:
+    id: deepseek
+    config:
+      retryPolicy:
+        retryableCodes:
+          - EMPTY_RESPONSE
+          - RATE_LIMIT
+          - SERVER
+          - TIMEOUT
+          - TRANSPORT
+          - MALFORMED_RESPONSE
+```
+
 ---
 
 ## 📄 License

@@ -246,8 +246,8 @@ async function main() {
     const rendered = collectText(tree2)
     check('shows the program name', rendered.includes('mem-ledger'), JSON.stringify(rendered.slice(0, 10)))
     check('shows the score', rendered.includes('80'), JSON.stringify(rendered.slice(0, 10)))
-    check('shows a failing case', rendered.includes('失败'), JSON.stringify(rendered.slice(0, 12)))
-    check('shows the contract debt', rendered.some((text) => text.includes('没有用例')), JSON.stringify(rendered.slice(0, 12)))
+    check('shows a failing case', rendered.some((text) => text.includes('失败')), JSON.stringify(rendered.slice(0, 12)))
+    check('debt line is not shown to user', !rendered.some((text) => text.includes('没有用例')))
     check('empty state is graceful', collectText(panel.type({ data: null })).some((text) => text.includes('暂未连接')))
 
     console.log('contract cases are shown in full (RQ-20261118-01):')
@@ -260,7 +260,7 @@ async function main() {
 
     console.log('weight is readable (RQ-20261118-01):')
     check('weight column is labelled 权重', rendered.includes('权重'))
-    check('legend explains the weight scale', rendered.some((text) => text.includes('普通用例 1') && text.includes('倒车用例 5')))
+    check('legend explains the weight scale', rendered.some((text) => text.includes('权重和') && text.includes('总分')))
     check('no cryptic w-prefixed weight badge', !rendered.some((text) => /^w\d+$/.test(text.trim())), JSON.stringify(rendered.filter((text) => /^w\d+$/.test(text.trim()))))
 
     console.log('styles ship the scrollbar rules:')
@@ -268,6 +268,26 @@ async function main() {
     check('css defines .ml-cases scroll area', css.includes('.ml-cases') && css.includes('overflow-y:auto'))
     check('css defines the weight pill', css.includes('.ml-case-w'))
     check('css no longer ellipsizes the case title', !/\.ml-case-title\{[^}]*text-overflow:ellipsis/.test(css))
+
+    console.log('antibody & regression alert view (RQ-20261125-02):')
+    const antibodyFixture = {
+      programs: [{
+        program: 'mem-ledger',
+        description: '台账核心工具',
+        cases: [
+          { id: 'C-001', title: '普通契约', weight: 1, status: 'active', last: { ok: true } },
+          { id: 'C-002', title: '防死锁回退契约', weight: 5, status: 'active', last: { ok: true } },
+        ],
+        regressionDebts: [{ id: 'CL-20261125-01', title: '尝试改用异步但造成阻塞' }],
+      }],
+      totalCases: 2,
+    }
+    const treeAntibody = panel.type({ data: antibodyFixture })
+    const renderedAntibody = collectText(treeAntibody)
+    check('renders antibody badge for weight>=5', renderedAntibody.some((text) => text.includes('🛡️防踩坑')), JSON.stringify(renderedAntibody))
+    check('renders regression alert for unprotected rollbacks', renderedAntibody.some((text) => text.includes('缺防踩坑保护') && text.includes('CL-20261125-01')), JSON.stringify(renderedAntibody))
+    check('css defines antibody pill', css.includes('.ml-case-w--antibody'))
+    check('css defines regression alert card', css.includes('.ml-reg-debt'))
   }
 
   console.log('')

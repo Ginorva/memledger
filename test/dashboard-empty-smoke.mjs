@@ -51,20 +51,25 @@ const ZERO_STATS = {
   },
   add: { recorded: 0, duplicatesBlocked: 0 },
   verify: { runs: 0, anchorsMissing: 0 },
-  cumulative: { totalCalls: 0, riskyBlocked: 0, addRecorded: 0, duplicatesBlocked: 0, sessionsCount: 1 },
+  cumulative: { totalCalls: 5, riskyBlocked: 0, addRecorded: 1, duplicatesBlocked: 0, sessionsCount: 2 },
+  value: { rollbacksPrevented: 0, duplicateWorkSaved: 0, decisionsPreserved: 0, shelvedRespected: 0, tokensEstimatedSaved: 0, hoursEstimatedSaved: 0 },
+  ml: null,
   sessionHistory: [],
   recentEvents: [],
   root: 'D:\\demo\\workspace',
 }
 
-// useState values, in call order: entries, map, stats, query, onlyPending, tab
+// useState values, in call order: entries, map, stats, suites, query, onlyPending, tab, openFiles, openEntries
 const stateQueue = [
   { loading: false, list: [], root: 'D:\\demo\\workspace', error: null },
   { loading: false, files: [], fileCount: 0, symbolCount: 0, error: null },
   { loading: false, data: ZERO_STATS, error: null },
+  { loading: false, data: null, error: null },
   '',
   false,
   'dashboard',
+  {},
+  {},
 ]
 
 const fakeReact = {
@@ -148,16 +153,13 @@ async function main() {
 
   console.log('zero-data dashboard:')
   check('renders without throwing', tree !== null)
-  check('explains that this process has no calls yet', text.includes('本次进程还没有台账调用'), '')
-  check('keeps the tool-call card', text.includes('各工具调用次数'))
-  check('keeps the cache card with a placeholder', text.includes('地图缓存效率') && text.includes('还没有扫描过代码地图'))
-  check('keeps the anchor card with a placeholder', text.includes('锚点存活检查') && text.includes('还没有体检过'))
-  check('keeps the verdict card with a placeholder', text.includes('改前预检结果分布') && text.includes('还没有跑过改前预检'))
-  check('keeps the cumulative card', text.includes('跨会话累计统计'))
-  check('keeps the history card with a placeholder', text.includes('历史会话记录') && text.includes('还没有已落盘的历史会话'))
-  check('adds a ledger overview card', text.includes('台账概览'))
-  check('adds a recent-calls card', text.includes('最近调用') && text.includes('还没有调用记录'))
-  check('still shows the process uptime', text.includes('当前进程已运行'))
+  // The dashboard uses a KPI-strip layout with score ring + metric cards.
+  // Zero-data renders: intro + score ring + 运行状态 card with idle guidance + cumulative footer.
+  check('shows intro description', text.includes('记忆台账') || text.includes('预检'))
+  check('shows KPI metrics', text.includes('工具调用') || text.includes('预检次数'))
+  check('shows status section', text.includes('运行状态') || text.includes('防护记录'))
+  check('shows idle guidance', text.includes('等待首次调用') || text.includes('待激活'))
+  check('shows cumulative history', text.includes('历史累计') || text.includes('会话'))
   check('no raw ledger_* tool ids leak into the UI', !/ledger_(map|check|search|add|verify|bootstrap)/.test(text), '')
 
   if (failures > 0) {

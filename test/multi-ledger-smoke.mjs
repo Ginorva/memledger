@@ -84,18 +84,19 @@ async function main() {
   mkdirSync(join(REPO, 'agent', 'docs'), { recursive: true })
   mkdirSync(join(REPO, 'core', 'docs'), { recursive: true })
   writeFileSync(join(REPO, 'guard.py'), 'def guard():\n    return True\n', 'utf-8')
+  writeFileSync(join(REPO, 'main.py'), 'def main():\n    return True\n', 'utf-8')
   writeFileSync(join(REPO, 'agent', 'wrap.py'), 'def wrap():\n    return True\n', 'utf-8')
   writeFileSync(join(REPO, 'core', 'eng.py'), 'def eng():\n    return True\n', 'utf-8')
 
   // The main ledger and the wrapper ledger deliberately share an id: the same
   // CL-yyyymmdd-nn means different things in different ledgers.
   writeLedger(join(REPO, 'docs', '变更台账.md'), [
-    ledgerEntry('CL-20260101-01', '主台账同号条目', '主台账的原因', 'guard.py', '主台账,主线,同号'),
+    ledgerEntry('CL-20260101-01', '主台账同号条目', '主台账的原因', 'main.py', '主台账,主线,同号'),
     ledgerEntry('CL-20260101-09', '主台账独有', '主台账独有原因', 'guard.py', '主台账独有'),
   ])
   writeLedger(join(REPO, 'agent', 'docs', '变更台账.md'), [
-    ledgerEntry('CL-20260101-01', '包装仓同号条目', '包装仓的原因', 'agent/wrap.py', '包装仓,副线,同号'),
-    ledgerEntry('CL-20260101-02', '包装仓独有', '包装仓独有原因', 'agent/wrap.py', '包装仓独有'),
+    ledgerEntry('CL-20260101-01', '包装仓同号条目', '包装仓的原因', 'agent/wrap.py::wrap', '包装仓,副线,同号'),
+    ledgerEntry('CL-20260101-02', '包装仓独有', '包装仓独有原因', 'agent/wrap.py::init', '包装仓独有'),
   ])
   writeLedger(join(REPO, 'core', 'docs', '变更台账.md'), [
     ledgerEntry('CL-20260101-03', '引擎仓独有', '引擎仓独有原因', 'core/eng.py', '引擎仓,引擎独有'),
