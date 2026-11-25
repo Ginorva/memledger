@@ -1,6 +1,17 @@
 node_modules/
 # runtime stats written by the plugin (per-workspace usage counters)
 .memledger-stats.json
+# workspace-specific generated files (contain real project decisions & structure)
+docs/变更台账.md
+docs/项目结构.md
+docs/.memledger-runs.jsonl
+docs/验收/
+docs/程序/
+docs/需求/
+# local benchmark data
+test/benchmark-results.json
 # scratch dirs created by the smoke tests
 .tmp-*/
 *.log
+# npm pack output
+*.tgz
