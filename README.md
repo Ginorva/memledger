@@ -1,5 +1,7 @@
 # MemLedger (`dsh-memledger`)
 
+**[中文](README.md)** | **[English](README.en.md)**
+
 > **空间有地图，时间有台账。**  
 > 为 DeepSeek Harness (DSH) 量身打造的工程管控与智能记忆插件：改动前查重与倒车预警，改动后沉淀「为什么」，彻底根治 AI 编程中**做歪、全盘乱扫、做重复、以及把已修好的功能无情改回**的核心痛点。
 
